@@ -8,11 +8,9 @@ from llama_index.embeddings import AzureOpenAIEmbedding
 from llama_index import (
     VectorStoreIndex,
     StorageContext,
-    load_index_from_storage,
     LLMPredictor,
     PromptHelper,
     ServiceContext,
-    set_global_service_context
 )
 
 # Example that reads the pages with the `page_ids`
@@ -21,7 +19,6 @@ from llama_hub.confluence import ConfluenceReader
 from llama_index.vector_stores import CognitiveSearchVectorStore
 from llama_index.vector_stores.cogsearch import (
     IndexManagement,
-    MetadataIndexFieldType,
     CognitiveSearchVectorStore,
 )
 
@@ -35,17 +32,7 @@ def run():
     llm = AzureOpenAI(
         engine=AZURE_OPENAI_CHAT_DEPLOYEMENT, model=AZURE_OPENAI_CHAT_MODEL, temperature=0.7, top_p=0.95
     )
-    # messages = [
-    #     ChatMessage(
-    #         role="system", content="You are a pirate with colorful personality."
-    #     ),
-    #     ChatMessage(
-    #         role="user", content="Where did you hide the ship?"
-    #     )
-    # ]
-
-    # res = llm.chat(messages)
-    # print(res)
+    
     llm_predictor = LLMPredictor(llm=llm)
 
     embed_model = AzureOpenAIEmbedding(
@@ -57,11 +44,11 @@ def run():
     )
 
     # max LLM token input size
-    max_input_size = 500
+    max_input_size = 128000
     # set number of output tokens
-    num_output = 48
+    num_output = 2048
     # set maximum chunk overlap
-    max_chunk_overlap = 0.2
+    max_chunk_overlap = 0.25
 
     prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
 
@@ -71,13 +58,7 @@ def run():
         prompt_helper=prompt_helper
     )
     
-    set_global_service_context(service_context)
-
-    # page_ids = ["232325167"]
-    # space_key = "CYB"
-    # reader = ConfluenceReader(base_url=CONFLUENCE_BASE_URL)
-    # documents = reader.load_data(space_key=space_key, include_attachments=False, page_status="current")
-    # documents.extend(reader.load_data(page_ids=page_ids, include_children=False, include_attachments=False))
+    # set_global_service_context(service_context)
 
     cognitive_search_credential = AzureKeyCredential(AZURE_COGNITIVE_SEARCH_APIKEY)
 
@@ -88,13 +69,6 @@ def run():
         endpoint=service_endpoint,
         credential=cognitive_search_credential,
     )
-
-    # Use search client to demonstration using existing index
-    # search_client = SearchClient(
-    #     endpoint=service_endpoint,
-    #     index_name=AZURE_COGNITIVE_SEARCH_INDEX_NAME,
-    #     credential=cognitive_search_credential,
-    # )
 
     vector_store = CognitiveSearchVectorStore(
         search_or_index_client=index_client,
@@ -108,9 +82,6 @@ def run():
     )
 
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    service_context = ServiceContext.from_defaults(
-        llm=llm, embed_model=embed_model, chunk_size=2000, chunk_overlap=0.3
-    )
 
     index = VectorStoreIndex.from_documents(
         [],
@@ -126,56 +97,7 @@ def run():
         documents = reader.load_data(space_key=space_key, include_attachments=False, page_status="current")
         documents.extend(reader.load_data(page_ids=[], include_children=False, include_attachments=False))
         for doc in documents:
-            print(doc.doc_id)
             index.insert(doc)
-
-    # index = VectorStoreIndex.from_documents(documents,show_progress=True)
-    # index.storage_context.persist()
-
-    #############old#########################
-
-    # # check if storage already exists
-    # if not os.path.exists("./storage"):
-    #      # load the documents and create the index
-
-    #     # reader = ConfluenceReader(base_url=CONFLUENCE_BASE_URL)
-    #     # cql=f'type=page and label='
-    #     # documents = reader.load_data(cql=cql, max_num_results=5)
-    #     # cursor = reader.get_next_cursor()
-    #     # documents.extend(reader.load_data(cql=cql, cursor=cursor, max_num_results=5))
-
-    #     index = VectorStoreIndex.from_documents([])
-    #     # page_ids = []
-    #     # space_key = "HWW"
-
-    #     confluence_spaces = CONFLUENCE_SPACE_LIST.split(",")
-
-    #     for space_key in confluence_spaces:
-    #         reader = ConfluenceReader(base_url=CONFLUENCE_BASE_URL)
-    #         documents = reader.load_data(space_key=space_key, include_attachments=False, page_status="current")
-    #         documents.extend(reader.load_data(page_ids=[], include_children=False, include_attachments=False))
-    #         for doc in documents:
-    #             print(doc.doc_id)
-    #             index.insert(doc)
-
-        
-    #     # store it for later
-    #     index.storage_context.persist()
-    # else:
-    #     # load the existing index
-    #     storage_context = StorageContext.from_defaults(persist_dir="./storage")
-    #     index = load_index_from_storage(storage_context)
-
-    # messages = [
-    #     ChatMessage(
-    #         role="system", content="You are a pirate with colorful personality."
-    #     ),
-    # ]
-
-    chat_engine = index.as_query_engine(similarity_top_k=2)
-    response = chat_engine.query("What is cybermity")
-    print(response)
-    print(response.source_nodes)
 
 
 if __name__ == "__main__":
